@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Бюро рацпредложений</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=PT+Serif:ital,wght@0,400;0,700;1,400&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="frame">
+  <header class="masthead">
+    <div class="masthead-left">
+      <span class="seal">БИР</span>
+      <div>
+        <h1>Бюро рационализаторских предложений</h1>
+        <p class="sub">Подготовка предложений по форме Ф. № БИ-7</p>
+      </div>
+    </div>
+    <nav class="tabs" id="tabs">
+      <button class="tab active" data-tab="new">Новое предложение</button>
+      <button class="tab" data-tab="authors">Авторы</button>
+      <button class="tab" data-tab="history">История</button>
+      <button class="tab" data-tab="settings">Настройки</button>
+    </nav>
+  </header>
+
+  <div class="version-banner hidden" id="versionBanner" role="alert"></div>
+
+  <main id="views">
+
+    <!-- ======================= NEW PROPOSAL ======================= -->
+    <section class="view active" id="view-new">
+      <div class="grid-2">
+        <div class="card">
+          <h2>1. Тема и концепция</h2>
+          <label class="field">
+            <span>Тема / идея предложения</span>
+            <textarea id="topic" rows="3" placeholder="Например: устройство для быстрой замены аккумуляторов радиостанции в полевых условиях..."></textarea>
+          </label>
+          <label class="field">
+            <span>Дополнительные пояснения (необязательно)</span>
+            <textarea id="extraContext" rows="2" placeholder="Любые детали, которые нейросеть должна учесть"></textarea>
+          </label>
+          <label class="field">
+            <span>Нейросеть</span>
+            <select id="providerSelect"></select>
+          </label>
+          <p class="hint">«Автоматически» пробует включённые нейросети по очереди (по приоритету из Настроек) — если у одной закончился лимит, программа сама переходит к следующей.</p>
+          <button class="btn primary" id="btnGenerate">Сгенерировать текст</button>
+          <div class="progress-wrap hidden" id="genProgress">
+            <div class="progress-bar" id="genProgressBar">
+              <div class="progress-segment" data-stage="sending" title="Отправка запроса"></div>
+              <div class="progress-segment" data-stage="received" title="Получение ответа"></div>
+              <div class="progress-segment" data-stage="forming" title="Формирование разделов"></div>
+              <div class="progress-segment" data-stage="done" title="Готово"></div>
+            </div>
+            <p class="progress-label" id="genProgressLabel"></p>
+          </div>
+          <p class="hint" id="generateStatus"></p>
+        </div>
+
+        <div class="card">
+          <h2>2. Наименование предложения</h2>
+          <label class="field">
+            <span>Начинается со слова «Способ» или «Модель»</span>
+            <input type="text" id="titleInput" placeholder="Способ ...">
+          </label>
+          <h2 class="mt">6. Подписант решения (стр. 2)</h2>
+          <label class="field">
+            <span>Статус/должность подписанта</span>
+            <input type="text" id="viceHead" value="Врио начальника">
+          </label>
+          <label class="field">
+            <span>ФИО подписанта (формат «И.Фамилия»)</span>
+            <div class="input-with-btn autocomplete-wrap">
+              <input type="text" id="viceFio" placeholder="Начните вводить или выберите..." value="И.Иванов" autocomplete="off">
+              <button type="button" class="btn btn-icon" id="btnOpenSignatoryPicker" title="Выбрать из списка">☰</button>
+              <div class="suggest-list hidden" id="signatorySuggest"></div>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>3. Разделы описания</h2>
+        <p class="hint">Сгенерированный текст можно свободно редактировать перед сборкой документа.</p>
+        <div class="sections" id="sectionsWrap"></div>
+      </div>
+
+      <div class="card">
+        <h2>4. Авторы и распределение вознаграждения (6 человек, в сумме 100%)</h2>
+        <div class="authors-picker" id="authorsPicker"></div>
+        <p class="hint" id="percentStatus"></p>
+      </div>
+
+      <div class="card actions-card">
+        <button class="btn primary large" id="btnBuild">Собрать документ (.docx)</button>
+        <p class="hint" id="buildStatus"></p>
+      </div>
+    </section>
+
+    <!-- ======================= AUTHOR PICKER MODAL ======================= -->
+    <div class="modal-overlay hidden" id="authorPickerModal">
+      <div class="modal">
+        <div class="modal-header">
+          <h3>Выбор автора <span id="authorPickerSlotLabel" class="muted"></span></h3>
+          <button class="modal-close" id="authorPickerClose" aria-label="Закрыть">&times;</button>
+        </div>
+        <input type="text" id="authorPickerSearch" class="search wide" placeholder="Поиск по всем полям...">
+        <div class="table-scroll">
+          <table class="ledger" id="authorPickerTable">
+            <thead>
+              <tr><th>Звание</th><th>ФИО</th><th>Должность</th><th>Место службы</th></tr>
+              <tr class="filter-row">
+                <th><input type="text" data-filter="rank" placeholder="фильтр"></th>
+                <th><input type="text" data-filter="full_name" placeholder="фильтр"></th>
+                <th><input type="text" data-filter="position" placeholder="фильтр"></th>
+                <th><input type="text" data-filter="workplace" placeholder="фильтр"></th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ======================= SIGNATORY PICKER MODAL ======================= -->
+    <div class="modal-overlay hidden" id="signatoryPickerModal">
+      <div class="modal">
+        <div class="modal-header">
+          <h3>Выбор подписанта</h3>
+          <button class="modal-close" id="signatoryPickerClose" aria-label="Закрыть">&times;</button>
+        </div>
+        <input type="text" id="signatoryPickerSearch" class="search wide" placeholder="Поиск по ФИО...">
+        <div class="picker-list" id="signatoryPickerList"></div>
+      </div>
+    </div>
+
+    <!-- ======================= AUTHORS ======================= -->
+    <section class="view" id="view-authors">
+      <div class="card">
+        <h2 id="authorFormTitle">Новый автор</h2>
+        <div class="author-form">
+          <input type="hidden" id="a_id">
+          <input type="text" id="a_rank" placeholder="Воинское звание (например: рядовой)">
+          <input type="text" id="a_name" placeholder="ФИО полностью (Иванов Иван Иванович)">
+          <input type="text" id="a_position" placeholder="Занимаемая должность">
+          <input type="text" id="a_workplace" placeholder="Место военной службы (работы)">
+          <div class="author-form-actions">
+            <button class="btn primary" id="btnSaveAuthor">Добавить</button>
+            <button class="btn small hidden" id="btnCancelAuthorEdit">Отмена</button>
+          </div>
+        </div>
+        <p class="hint" id="authorFormStatus"></p>
+      </div>
+      <div class="card">
+        <div class="row-between">
+          <h2>База авторов</h2>
+          <input type="text" id="authorSearch" class="search" placeholder="Поиск по всем полям...">
+        </div>
+        <div class="header-actions">
+          <button class="btn small" id="btnExportAuthors">⬇ Скачать .csv</button>
+          <label class="btn small file-btn">
+            ⬆ Загрузить из файла...
+            <input type="file" id="authorsImportInput" accept=".csv" class="hidden">
+          </label>
+        </div>
+        <p class="hint">
+          Экспорт — файл со всеми авторами (для переноса на другой сервер или как резервная копия).
+          Импорт добавляет новых и обновляет существующих по ФИО — старые записи не затираются целиком и не дублируются.
+        </p>
+        <p class="hint" id="authorsImportStatus"></p>
+        <div class="table-scroll">
+          <table class="ledger" id="authorsTable">
+            <thead>
+              <tr><th>Звание</th><th>ФИО</th><th>Должность</th><th>Место службы</th><th></th></tr>
+              <tr class="filter-row">
+                <th><input type="text" data-filter="rank" placeholder="фильтр"></th>
+                <th><input type="text" data-filter="full_name" placeholder="фильтр"></th>
+                <th><input type="text" data-filter="position" placeholder="фильтр"></th>
+                <th><input type="text" data-filter="workplace" placeholder="фильтр"></th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======================= HISTORY ======================= -->
+    <section class="view" id="view-history">
+      <div class="card">
+        <h2>Сгенерированные предложения</h2>
+        <div class="table-scroll">
+          <table class="ledger" id="historyTable">
+            <thead><tr><th>#</th><th>Наименование</th><th>Дата</th><th>Нейросеть</th><th></th><th></th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======================= SETTINGS ======================= -->
+    <section class="view" id="view-settings">
+      <div class="card">
+        <h2>Шаблон документа</h2>
+        <p class="hint">
+          Шаблон хранится отдельно от кода программы (в томе с данными), поэтому его можно
+          менять прямо здесь, без переустановки или пересборки Docker-образа — загрузка сразу
+          вступает в силу. Перед сохранением файл проверяется пробной сборкой документа: если
+          в нём не хватает нужных таблиц или плейсхолдеров (<code>{{SIGN}}</code>,
+          <code>{{VICE_HEAD}}</code>, <code>{{VICE_FIO}}</code>, <code>{{section1}}</code>…<code>{{section6}}</code>),
+          загрузка отклоняется с объяснением, а старый шаблон продолжает работать.
+        </p>
+        <div id="templateStatusBox" class="template-status"></div>
+        <div class="header-actions">
+          <button class="btn small" id="btnDownloadTemplate">Скачать текущий шаблон</button>
+          <label class="btn small file-btn">
+            Загрузить новый...
+            <input type="file" id="templateFileInput" accept=".docx" class="hidden">
+          </label>
+          <button class="btn small hidden" id="btnResetTemplate">Вернуть встроенный шаблон</button>
+        </div>
+        <p class="hint" id="templateUploadStatus"></p>
+      </div>
+
+      <div class="card">
+        <h2>Статистика по моделям</h2>
+        <p class="hint">
+          Сводка из журнала событий: сколько раз каждая модель успешно/неуспешно использовалась
+          при генерации документа и при ручных проверках. Помогает выбрать приоритеты и подобрать
+          «Максимум токенов ответа» без ручного просмотра журнала каждой модели по отдельности.
+        </p>
+        <div class="table-scroll">
+          <table class="ledger" id="statsTable">
+            <thead><tr><th>Модель</th><th>Тип</th><th>Генераций успешно</th><th>Генераций с ошибкой</th><th>Успешность</th><th>Проверок успешно/с ошибкой</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="row-between">
+          <h2>Нейросети</h2>
+          <div class="header-actions">
+            <button class="btn small" id="btnPingAll" title="Проверить доступность всех моделей">⟳ Пинг всех</button>
+            <button class="btn primary small" id="btnShowAddModel">+ Добавить модель</button>
+          </div>
+        </div>
+        <p class="hint">
+          Можно добавить сколько угодно бесплатных и платных моделей. При генерации программа
+          пробует включённые модели по очереди — от меньшего приоритета к большему; если у одной
+          закончился лимит или она недоступна, автоматически переходит к следующей. Название модели
+          кликабельно и ведёт на страницу модели на openrouter.ai, если адрес указывает на OpenRouter.
+        </p>
+
+        <div class="row-between">
+          <input type="text" id="modelSearch" class="search" placeholder="Поиск по названию или модели...">
+        </div>
+        <div class="table-scroll">
+          <table class="ledger" id="modelsTable">
+            <thead>
+              <tr>
+                <th class="sortable" data-sort="enabled" title="Сортировать по включённости">✓ ⇅</th>
+                <th>Название</th><th>Тип</th><th>Модель</th><th>Тариф</th><th>Лимит</th>
+                <th class="sortable" data-sort="priority" title="Сортировать по приоритету">Приоритет ⇅</th>
+                <th>Статус</th><th></th>
+              </tr>
+              <tr class="filter-row">
+                <th></th>
+                <th><input type="text" data-filter="name" placeholder="фильтр"></th>
+                <th>
+                  <select data-filter="provider_type"><option value="">все</option></select>
+                </th>
+                <th><input type="text" data-filter="model" placeholder="фильтр"></th>
+                <th>
+                  <select data-filter="is_paid"><option value="">все</option><option value="0">бесплатная</option><option value="1">платная</option></select>
+                </th>
+                <th>
+                  <select data-filter="limit"><option value="">все</option><option value="ok">в норме</option><option value="exceeded">исчерпан</option></select>
+                </th>
+                <th></th>
+                <th>
+                  <select data-filter="last_check_status"><option value="">все</option><option value="ok">доступна</option><option value="error">ошибка</option><option value="unknown">не проверено</option></select>
+                </th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Сохранённые адреса API</h2>
+        <p class="hint">Чтобы не вводить одни и те же адреса заново — они подставляются подсказкой в поле «Адрес» выше.</p>
+        <div class="endpoint-list" id="endpointsList"></div>
+      </div>
+
+      <div class="card">
+        <h2>Подписанты (ФИО)</h2>
+        <p class="hint">
+          Сохранённые варианты для поля «ФИО подписанта» на вкладке «Новое предложение»
+          (формат «И.Фамилия») — чтобы не вводить их заново каждый раз.
+        </p>
+        <div class="header-actions">
+          <input type="text" id="newSignatoryInput" class="search" placeholder="Например: И.Иванов">
+          <button class="btn primary small" id="btnAddSignatory">Добавить</button>
+        </div>
+        <div class="endpoint-list" id="signatoriesList"></div>
+      </div>
+
+    </section>
+
+    <!-- ======================= MODEL DETAILS + LOG MODAL ======================= -->
+    <div class="modal-overlay hidden" id="modelDetailsModal">
+      <div class="modal modal-wide">
+        <div class="modal-header">
+          <h3 id="modelDetailsTitle">Новая модель</h3>
+          <button class="modal-close" id="modelDetailsClose" aria-label="Закрыть">&times;</button>
+        </div>
+
+        <form id="modelForm">
+          <input type="hidden" id="m_id">
+          <div class="model-form-grid">
+            <label class="field"><span>Название (для себя)</span><input type="text" id="m_name" placeholder="Например: OpenRouter DeepSeek"></label>
+            <label class="field"><span>Тип API</span>
+              <select id="m_provider_type"></select>
+            </label>
+            <label class="field">
+              <span>Адрес (base_url)</span>
+              <div class="input-with-btn autocomplete-wrap">
+                <input type="text" id="m_base_url" placeholder="Начните вводить или выберите сохранённый..." autocomplete="off">
+                <button type="button" class="btn small" id="btnSaveBaseUrl" title="Сохранить этот адрес для повторного использования">💾</button>
+                <div class="suggest-list hidden" id="baseUrlSuggest"></div>
+              </div>
+            </label>
+            <label class="field">
+              <span>Модель</span>
+              <div class="input-with-btn">
+                <input type="text" id="m_model" placeholder="deepseek/deepseek-chat-v3.1:free">
+                <button type="button" class="btn small" id="btnOpenCatalog" title="Выбрать модель из каталога OpenRouter / Ollama / LM Studio">🔍 Каталог</button>
+              </div>
+            </label>
+            <div class="field">
+              <label for="m_api_key" class="label-with-badge">API-ключ <i class="badge" id="m_api_key_state"></i></label>
+              <input type="password" id="m_api_key" autocomplete="new-password">
+              <small class="field-hint">
+                <i id="m_api_key_hint"></i>
+                <button type="button" class="link-btn hidden" id="btnClearApiKey">удалить сохранённый ключ</button>
+              </small>
+            </div>
+            <label class="field"><span>Приоритет (меньше = пробуется раньше)</span><input type="number" id="m_priority" value="100" step="1"></label>
+            <label class="field">
+              <span>Максимум токенов ответа</span>
+              <input type="number" id="m_max_tokens" value="4000" min="256" step="1">
+            </label>
+          </div>
+          <p class="hint">
+            «Максимум токенов ответа» ограничивает длину сгенерированного текста. Если конкретная
+            модель отклоняет запрос как «слишком много токенов», уменьшите значение именно у неё —
+            в журнале событий ниже будет видно точную причину отказа.
+          </p>
+          <label class="checkbox-field"><input type="checkbox" id="m_is_paid"> Платная модель</label>
+          <div class="model-form-actions">
+            <button type="submit" class="btn primary small">Сохранить</button>
+            <button type="button" class="btn small" id="btnCancelModel">Отмена</button>
+          </div>
+          <p class="hint" id="modelFormStatus"></p>
+        </form>
+
+        <div class="model-log-wrap hidden" id="modelLogWrap">
+          <div class="row-between">
+            <h4>Журнал событий</h4>
+            <button type="button" class="btn small" id="btnClearModelLog">Очистить журнал</button>
+          </div>
+          <p class="hint">Каждая проверка и каждая попытка использования этой модели при генерации — с точным ответом сервера, чтобы понять, что произошло на самом деле.</p>
+          <div class="model-log-list" id="modelLogList"></div>
+          <button type="button" class="btn small hidden" id="btnLoadMoreLog">Показать ещё</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ======================= MODEL CATALOG MODAL (поверх окна модели) ======================= -->
+    <div class="modal-overlay modal-stacked hidden" id="catalogModal">
+      <div class="modal modal-wide">
+        <div class="modal-header">
+          <h3>Каталог моделей</h3>
+          <button class="modal-close" id="catalogClose" aria-label="Закрыть">&times;</button>
+        </div>
+
+        <div class="catalog-controls">
+          <label class="catalog-source">
+            <span class="sr-only">Провайдер</span>
+            <select id="catalogSource" title="Провайдер"></select>
+          </label>
+          <div class="input-with-btn catalog-url">
+            <input type="text" id="catalogBaseUrl" placeholder="Адрес сервера">
+            <button type="button" class="btn small" id="catalogReload" title="Загрузить список заново, минуя кэш">⟳ Обновить</button>
+          </div>
+        </div>
+        <p class="catalog-source-info" id="catalogSourceInfo"></p>
+
+        <div class="catalog-filters">
+          <input type="text" id="catalogSearch" class="search" placeholder="Поиск по названию или id...">
+          <select id="catalogPriceFilter" title="Тариф">
+            <option value="all">Все модели</option>
+            <option value="free">Только бесплатные</option>
+            <option value="paid">Только платные</option>
+          </select>
+          <select id="catalogSort" title="Сортировка"></select>
+        </div>
+
+        <p class="hint" id="catalogStatus"></p>
+
+        <div class="table-scroll catalog-scroll">
+          <table class="ledger" id="catalogTable">
+            <thead>
+              <tr><th class="cat-rank-col">#</th><th>Модель</th><th>Контекст</th><th>Макс. ответ</th><th id="catalogPriceHeader">Цена за 1 млн токенов<br><span class="muted">вход / выход</span></th></tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <p class="hint">Клик по строке заполнит форму модели: тип API, адрес, id модели, название, тариф и рекомендуемый «Максимум токенов ответа». Останется вписать API-ключ, если провайдер его требует.</p>
+      </div>
+    </div>
+
+    <!-- ======================= О ПРОГРАММЕ ======================= -->
+    <div class="modal-overlay hidden" id="aboutModal">
+      <div class="modal about-modal" role="dialog" aria-labelledby="aboutTitle">
+        <div class="modal-header">
+          <h3 id="aboutTitle">О программе</h3>
+          <button class="modal-close" id="aboutClose" aria-label="Закрыть">&times;</button>
+        </div>
+        <div class="about-head">
+          <span class="seal">БИР</span>
+          <div>
+            <div class="about-name">Бюро рационализаторских предложений</div>
+            <div class="about-sub">Подготовка предложений по форме Ф. № БИ-7</div>
+          </div>
+        </div>
+        <p class="about-text">
+          Программа помогает подготовить рационализаторское предложение: нейросеть пишет
+          текст шести разделов по заданной теме, а программа собирает готовый документ
+          .docx по бланку — с авторами, распределением вознаграждения и подписями.
+        </p>
+        <dl class="about-credits">
+          <dt>Автор и разработчик</dt>
+          <dd>Лаукарт Михаил Сергеевич</dd>
+          <dt>Версия</dt>
+          <dd id="aboutVersion"></dd>
+        </dl>
+      </div>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <span>© <span id="footerYear">2026</span> · Автор и разработчик — М.С. Лаукарт</span>
+    <button type="button" class="link-btn footer-link" id="btnAbout">О программе</button>
+  </footer>
+</div>
+<script src="app.js"></script>
+</body>
+</html>

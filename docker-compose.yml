@@ -1,0 +1,48 @@
+services:
+  rac-generator:
+    build:
+      context: .
+      args:
+        # переопределите в .env, если pypi.org недоступен напрямую из вашей сети
+        # (см. "Проблемы со сборкой образа" в README), например на зеркало:
+        # PIP_INDEX_URL=https://pypi.org/simple
+        PIP_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.org/simple}
+    image: rac-generator:latest
+    ports:
+      - "${APP_PORT:-8000}:8000"
+    environment:
+      # число uvicorn-воркеров внутри контейнера (см. "Масштабирование" в README)
+      - WEB_CONCURRENCY=${WEB_CONCURRENCY:-2}
+      # Защита паролем (HTTP Basic) - см. "Защита доступа" в README. Задайте
+      # обе переменные в .env, иначе приложение останется БЕЗ пароля - любой,
+      # кто достанет до порта, увидит данные авторов и ключи API.
+      - APP_USERNAME=${APP_USERNAME:-}
+      - APP_PASSWORD=${APP_PASSWORD:-}
+      # Общий потолок (в секундах) на весь перебор моделей/эскалаций одной
+      # генерации - см. "Защита от зависшей генерации" в README.
+      - GENERATION_DEADLINE_SECONDS=${GENERATION_DEADLINE_SECONDS:-600}
+      # Тайм-аут ОДНОЙ попытки обращения к модели (секунды).
+      - GENERATION_TIMEOUT_SECONDS=${GENERATION_TIMEOUT_SECONDS:-240}
+      # Часовой пояс для даты в документе: контейнер работает в UTC, и без
+      # этого с 00:00 до 03:00 по Москве в документ попадала вчерашняя дата.
+      - APP_TIMEZONE=${APP_TIMEZONE:-Europe/Moscow}
+    # Делает адрес host.docker.internal (= ваш компьютер, а не сам контейнер)
+    # доступным и на Linux - нужен, чтобы из контейнера достучаться до
+    # локально запущенных Ollama / LM Studio. На Docker Desktop (Windows/macOS)
+    # этот адрес и так работает, строка ничему не мешает.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      # база авторов/истории и сгенерированные .docx хранятся здесь и переживают
+      # docker compose down / пересборку образа
+      - rac-data:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  rac-data:
